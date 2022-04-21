@@ -466,8 +466,10 @@ export class ImageRequest {
 
       try {
         const { signature } = queryStringParameters;
-        const secret = JSON.parse(await this.secretProvider.getSecret(SECRETS_MANAGER));
-        const key = secret[SECRET_KEY];
+        // If SECRETS_MANAGER is specified, receive the secret from there
+        // otherwise, use SECRET_KEY as the secret
+        const secret = SECRETS_MANAGER ? JSON.parse(await this.secretProvider.getSecret(SECRETS_MANAGER)) : null;
+        const key = secret ? secret[SECRET_KEY] : SECRET_KEY;
         const hash = createHmac('sha256', key).update(path).digest('hex');
 
         // Signature should be made with the full path.
