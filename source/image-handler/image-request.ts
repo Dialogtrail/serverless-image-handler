@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import S3 from 'aws-sdk/clients/s3';
+import axios from 'axios';
 import { createHmac } from 'crypto';
 
-import { DefaultImageRequest, ImageEdits, ImageFormatTypes, ImageHandlerError, ImageHandlerEvent, ImageRequestInfo, Headers, RequestTypes, StatusCodes } from './lib';
+import { Options, DefaultImageRequest, ImageEdits, ImageFormatTypes, ImageHandlerError, ImageHandlerEvent, ImageRequestInfo, Headers, RequestTypes, StatusCodes } from './lib';
 import { SecretProvider } from './secret-provider';
 import { ThumborMapper } from './thumbor-mapper';
 
@@ -35,9 +36,11 @@ export class ImageRequest {
       imageRequestInfo.requestType = this.parseRequestType(event);
       imageRequestInfo.bucket = this.parseImageBucket(event, imageRequestInfo.requestType);
       imageRequestInfo.key = this.parseImageKey(event, imageRequestInfo.requestType);
+      imageRequestInfo.url = this.parseImageUrl(event);
       imageRequestInfo.edits = this.parseImageEdits(event, imageRequestInfo.requestType);
+      imageRequestInfo.options = this.parseOptions(event);
 
-      const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key);
+      const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key, imageRequestInfo.url);
       imageRequestInfo = { ...imageRequestInfo, ...originalImage };
 
       imageRequestInfo.headers = this.parseImageHeaders(event, imageRequestInfo.requestType);
@@ -100,43 +103,47 @@ export class ImageRequest {
    * @param key The key name corresponding to the image.
    * @returns The original image or an error.
    */
-  public async getOriginalImage(bucket: string, key: string): Promise<OriginalImageInfo> {
+  public async getOriginalImage(bucket: string, key: string, url: string): Promise<OriginalImageInfo> {
     try {
       const result: OriginalImageInfo = {};
 
-      const imageLocation = { Bucket: bucket, Key: key };
-      const originalImage = await this.s3Client.getObject(imageLocation).promise();
-      const imageBuffer = Buffer.from(originalImage.Body as Uint8Array);
+      if (key) {
+        const imageLocation = { Bucket: bucket, Key: key };
+        const originalImage = await this.s3Client.getObject(imageLocation).promise();
+        const imageBuffer = Buffer.from(originalImage.Body as Uint8Array);
 
-      if (originalImage.ContentType) {
-        // If using default S3 ContentType infer from hex headers
-        if (['binary/octet-stream', 'application/octet-stream'].includes(originalImage.ContentType)) {
-          result.contentType = this.inferImageType(imageBuffer);
+        if (originalImage.ContentType) {
+          // If using default S3 ContentType infer from hex headers
+          if (['binary/octet-stream', 'application/octet-stream'].includes(originalImage.ContentType)) {
+            result.contentType = this.inferImageType(imageBuffer);
+          } else {
+            result.contentType = originalImage.ContentType;
+          }
         } else {
-          result.contentType = originalImage.ContentType;
+          result.contentType = 'image';
         }
+
+        if (originalImage.Expires) {
+          result.expires = new Date(originalImage.Expires).toUTCString();
+        }
+
+        if (originalImage.LastModified) {
+          result.lastModified = new Date(originalImage.LastModified).toUTCString();
+        }
+
+        result.cacheControl = originalImage.CacheControl ?? 'max-age=31536000,public';
+        result.originalImage = imageBuffer;
       } else {
-        result.contentType = 'image';
+        const resp = await axios.get(url, { responseType: 'arraybuffer' });
+        result.originalImage = Buffer.from(resp.data);
       }
-
-      if (originalImage.Expires) {
-        result.expires = new Date(originalImage.Expires).toUTCString();
-      }
-
-      if (originalImage.LastModified) {
-        result.lastModified = new Date(originalImage.LastModified).toUTCString();
-      }
-
-      result.cacheControl = originalImage.CacheControl ?? 'max-age=31536000,public';
-      result.originalImage = imageBuffer;
-
       return result;
     } catch (error) {
       let status = StatusCodes.INTERNAL_SERVER_ERROR;
       let message = error.message;
       if (error.code === 'NoSuchKey') {
         status = StatusCodes.NOT_FOUND;
-        message = `The image ${key} does not exist or the request may not be base64 encoded properly.`;
+        message = `The image ${key ?? url} does not exist or the request may not be base64 encoded properly.`;
       }
       throw new ImageHandlerError(status, error.code, message);
     }
@@ -305,6 +312,26 @@ export class ImageRequest {
         return headers;
       }
     }
+  }
+
+  /**
+   * Return the sharp options
+   * @param event Lambda request body.
+   * @returns The sharp options
+   */
+  public parseOptions(event: ImageHandlerEvent): Options {
+    const decoded = this.decodeRequest(event);
+    return decoded.options;
+  }
+
+  /**
+   * Return the http url
+   * @param event Lambda request body.
+   * @returns The url
+   */
+  public parseImageUrl(event: ImageHandlerEvent): string {
+    const decoded = this.decodeRequest(event);
+    return decoded.url;
   }
 
   /**

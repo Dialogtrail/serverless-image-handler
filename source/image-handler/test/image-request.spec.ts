@@ -879,7 +879,7 @@ describe('getOriginalImage()', () => {
 
       // Act
       const imageRequest = new ImageRequest(s3Client, secretProvider);
-      const result = await imageRequest.getOriginalImage('validBucket', 'validKey');
+      const result = await imageRequest.getOriginalImage('validBucket', 'validKey', null);
 
       // Assert
       expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'validBucket', Key: 'validKey' });
@@ -901,7 +901,7 @@ describe('getOriginalImage()', () => {
 
       // Assert
       try {
-        await imageRequest.getOriginalImage('invalidBucket', 'invalidKey');
+        await imageRequest.getOriginalImage('invalidBucket', 'invalidKey', null);
       } catch (error) {
         expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'invalidBucket', Key: 'invalidKey' });
         expect(error.status).toEqual(StatusCodes.NOT_FOUND);
@@ -923,7 +923,7 @@ describe('getOriginalImage()', () => {
 
       // Assert
       try {
-        await imageRequest.getOriginalImage('invalidBucket', 'invalidKey');
+        await imageRequest.getOriginalImage('invalidBucket', 'invalidKey', null);
       } catch (error) {
         expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'invalidBucket', Key: 'invalidKey' });
         expect(error.status).toEqual(StatusCodes.INTERNAL_SERVER_ERROR);
@@ -958,7 +958,7 @@ describe('getOriginalImage()', () => {
 
         // Act
         const imageRequest = new ImageRequest(s3Client, secretProvider);
-        const result = await imageRequest.getOriginalImage('validBucket', 'validKey');
+        const result = await imageRequest.getOriginalImage('validBucket', 'validKey', null);
 
         // Assert
         expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'validBucket', Key: 'validKey' });
@@ -979,7 +979,7 @@ describe('getOriginalImage()', () => {
 
         // Act
         const imageRequest = new ImageRequest(s3Client, secretProvider);
-        const result = await imageRequest.getOriginalImage('validBucket', 'validKey');
+        const result = await imageRequest.getOriginalImage('validBucket', 'validKey', null);
 
         // Assert
         expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'validBucket', Key: 'validKey' });
@@ -1001,7 +1001,7 @@ describe('getOriginalImage()', () => {
         // Act
         const imageRequest = new ImageRequest(s3Client, secretProvider);
         try {
-          await imageRequest.getOriginalImage('validBucket', 'validKey');
+          await imageRequest.getOriginalImage('validBucket', 'validKey', null);
         } catch (error) {
           // Assert
           expect(mockAwsS3.getObject).toHaveBeenCalledWith({ Bucket: 'validBucket', Key: 'validKey' });

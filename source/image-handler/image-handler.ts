@@ -19,6 +19,7 @@ export class ImageHandler {
    */
   async process(imageRequestInfo: ImageRequestInfo): Promise<string> {
     const { originalImage, edits } = imageRequestInfo;
+    const options = { ...imageRequestInfo.options, failOnError: false };
 
     let base64EncodedImage = '';
 
@@ -26,12 +27,12 @@ export class ImageHandler {
       let image: sharp.Sharp = null;
 
       if (edits.rotate !== undefined && edits.rotate === null) {
-        image = sharp(originalImage, { failOnError: false });
+        image = sharp(originalImage, options);
       } else {
-        const metadata = await sharp(originalImage, { failOnError: false }).metadata();
+        const metadata = await sharp(originalImage, options).metadata();
         image = metadata.orientation
-          ? sharp(originalImage, { failOnError: false }).withMetadata({ orientation: metadata.orientation })
-          : sharp(originalImage, { failOnError: false }).withMetadata();
+          ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
+          : sharp(originalImage, options).withMetadata();
       }
 
       const modifiedImage = await this.applyEdits(image, edits);
@@ -48,7 +49,7 @@ export class ImageHandler {
     } else {
       // change output format if specified
       if (imageRequestInfo.outputFormat !== undefined) {
-        const modifiedImage = sharp(originalImage, { failOnError: false });
+        const modifiedImage = sharp(originalImage, options);
         modifiedImage.toFormat(ImageHandler.convertImageFormatType(imageRequestInfo.outputFormat));
 
         const imageBuffer = await modifiedImage.toBuffer();

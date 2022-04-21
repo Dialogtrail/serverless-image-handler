@@ -4,7 +4,7 @@
 import sharp from 'sharp';
 
 import { ImageFormatTypes, RequestTypes, StatusCodes } from './enums';
-import { Headers, ImageEdits } from './types';
+import { Headers, ImageEdits, Options } from './types';
 
 export interface ImageHandlerEvent {
   path?: string;
@@ -19,11 +19,13 @@ export interface ImageHandlerEvent {
 
 export interface DefaultImageRequest {
   bucket?: string;
-  key: string;
+  key?: string;
+  url?: string;
   edits?: ImageEdits;
   outputFormat?: ImageFormatTypes;
   reductionEffort?: number;
   headers?: Headers;
+  options?: Options;
 }
 
 export interface BoundingBox {
@@ -40,8 +42,9 @@ export interface BoxSize {
 
 export interface ImageRequestInfo {
   requestType: RequestTypes;
-  bucket: string;
-  key: string;
+  bucket?: string;
+  key?: string;
+  url?: string;
   edits?: ImageEdits;
   originalImage: Buffer;
   headers?: Headers;
@@ -51,6 +54,7 @@ export interface ImageRequestInfo {
   cacheControl?: string;
   outputFormat?: ImageFormatTypes;
   reductionEffort?: number;
+  options?: Options;
 }
 
 export interface RekognitionCompatibleImage {
