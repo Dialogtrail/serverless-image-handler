@@ -179,9 +179,18 @@ export class ImageRequest {
         return sourceBuckets[0];
       }
     } else if (requestType === RequestTypes.THUMBOR || requestType === RequestTypes.CUSTOM) {
-      // Use the default image source bucket env var
+      // See if the path contains bucket(BUCKET_NAME)
+      const bucketMatchResult = event.path.match(/bucket\(((?:\w|\d|-|_)+)\)/);
       const sourceBuckets = this.getAllowedSourceBuckets();
-      return sourceBuckets[0];
+
+      if (bucketMatchResult) {
+        // Use the provided bucket if it's included in the allowed list
+        const bucket = bucketMatchResult[1];
+        if (bucket && sourceBuckets.includes(bucket)) return bucket;
+      } else {
+        // Use the default image source bucket env var
+        return sourceBuckets[0];
+      }
     } else {
       throw new ImageHandlerError(
         StatusCodes.NOT_FOUND,
@@ -248,7 +257,7 @@ export class ImageRequest {
         }
       }
 
-      return decodeURIComponent(path.replace(/\/\d+x\d+:\d+x\d+\/|(?<=\/)\d+x\d+\/|filters:[^/]+|\/fit-in(?=\/)|^\/+/g, '').replace(/^\/+/, ''));
+      return decodeURIComponent(path.replace(/\/\d+x\d+:\d+x\d+\/|(?<=\/)\d+x\d+\/|filters:[^/]+|animated\([^/]+|bucket\([^/]+|\/fit-in(?=\/)|^\/+/g, '').replace(/^\/+/, ''));
     }
 
     // Return an error for all other conditions
