@@ -109,7 +109,31 @@ export class ImageRequest {
 
       if (url) {
         const resp = await axios.get(url, { responseType: 'arraybuffer' });
-        result.originalImage = Buffer.from(resp.data);
+        const imageBuffer = Buffer.from(resp.data);
+
+        console.log({headers: resp.headers})
+
+        if (resp.headers['Content-Type']) {
+          if (['binary/octet-stream', 'application/octet-stream'].includes(resp.headers['Content-Type'])) {
+            result.contentType = this.inferImageType(imageBuffer);
+          } else {
+            result.contentType = resp.headers['Content-Type'];
+          }
+        } else {
+          result.contentType = 'image';
+        }
+
+        if (resp.headers['Expires']) {
+          result.expires = new Date(resp.headers['Content-Type']).toUTCString();
+        }
+
+        if (resp.headers['Last-Modified']) {
+          result.lastModified = new Date(resp.headers['Last-Modified']).toUTCString();
+        }
+
+        result.cacheControl = resp.headers['Cache-Control'] ?? 'max-age=31536000,public';
+
+        result.originalImage = imageBuffer;
       } else if (key) {
         const imageLocation = { Bucket: bucket, Key: key };
         const originalImage = await this.s3Client.getObject(imageLocation).promise();

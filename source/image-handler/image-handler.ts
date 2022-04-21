@@ -17,11 +17,12 @@ export class ImageHandler {
    * @param imageRequestInfo An image request.
    * @returns Processed and modified image encoded as base64 string.
    */
-  async process(imageRequestInfo: ImageRequestInfo): Promise<string> {
+  async process(imageRequestInfo: ImageRequestInfo): Promise<{ image: string; processedSize: number }> {
     const { originalImage, edits } = imageRequestInfo;
     const options = { ...imageRequestInfo.options, failOnError: false };
 
     let base64EncodedImage = '';
+    let processedSize = 0;
 
     if (edits && Object.keys(edits).length) {
       let image: sharp.Sharp = null;
@@ -30,9 +31,7 @@ export class ImageHandler {
         image = sharp(originalImage, options);
       } else {
         const metadata = await sharp(originalImage, options).metadata();
-        image = metadata.orientation
-          ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation })
-          : sharp(originalImage, options).withMetadata();
+        image = metadata.orientation ? sharp(originalImage, options).withMetadata({ orientation: metadata.orientation }) : sharp(originalImage, options).withMetadata();
       }
 
       const modifiedImage = await this.applyEdits(image, edits);
@@ -46,6 +45,7 @@ export class ImageHandler {
 
       const imageBuffer = await modifiedImage.toBuffer();
       base64EncodedImage = imageBuffer.toString('base64');
+      processedSize = imageBuffer.length;
     } else {
       // change output format if specified
       if (imageRequestInfo.outputFormat !== undefined) {
@@ -54,8 +54,10 @@ export class ImageHandler {
 
         const imageBuffer = await modifiedImage.toBuffer();
         base64EncodedImage = imageBuffer.toString('base64');
+        processedSize = imageBuffer.length;
       } else {
         base64EncodedImage = originalImage.toString('base64');
+        processedSize = originalImage.length;
       }
     }
 
@@ -65,7 +67,7 @@ export class ImageHandler {
       throw new ImageHandlerError(StatusCodes.REQUEST_TOO_LONG, 'TooLargeImageException', 'The converted image is too large to return.');
     }
 
-    return base64EncodedImage;
+    return { image: base64EncodedImage, processedSize };
   }
 
   /**

@@ -34,7 +34,7 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     const imageRequestInfo = await imageRequest.setup(event);
     console.info(imageRequestInfo);
 
-    const processedRequest = await imageHandler.process(imageRequestInfo);
+    const { image, processedSize } = await imageHandler.process(imageRequestInfo);
 
     let headers = getResponseHeaders(false, isAlb);
     headers['Content-Type'] = imageRequestInfo.contentType;
@@ -42,6 +42,9 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
     headers['Expires'] = imageRequestInfo.expires;
     headers['Last-Modified'] = imageRequestInfo.lastModified;
     headers['Cache-Control'] = imageRequestInfo.cacheControl;
+
+    headers['X-Original-Size'] = imageRequestInfo.originalImage.length;
+    headers['X-Processed-Size'] = processedSize;
 
     // Apply the custom headers overwriting any that may need overwriting
     if (imageRequestInfo.headers) {
@@ -52,7 +55,7 @@ export async function handler(event: ImageHandlerEvent): Promise<ImageHandlerExe
       statusCode: StatusCodes.OK,
       isBase64Encoded: true,
       headers: headers,
-      body: processedRequest
+      body: image
     };
   } catch (error) {
     console.error(error);
