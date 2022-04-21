@@ -36,9 +36,10 @@ export class ImageRequest {
       imageRequestInfo.requestType = this.parseRequestType(event);
       imageRequestInfo.bucket = this.parseImageBucket(event, imageRequestInfo.requestType);
       imageRequestInfo.key = this.parseImageKey(event, imageRequestInfo.requestType);
-      imageRequestInfo.url = this.parseImageUrl(event);
+      imageRequestInfo.url = this.parseImageUrl(event, imageRequestInfo.requestType);
       imageRequestInfo.edits = this.parseImageEdits(event, imageRequestInfo.requestType);
-      imageRequestInfo.options = this.parseOptions(event);
+      imageRequestInfo.options = this.parseOptions(event, imageRequestInfo.requestType);
+      console.log(JSON.stringify(imageRequestInfo));
 
       const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key, imageRequestInfo.url);
       imageRequestInfo = { ...imageRequestInfo, ...originalImage };
@@ -107,7 +108,10 @@ export class ImageRequest {
     try {
       const result: OriginalImageInfo = {};
 
-      if (key) {
+      if (url) {
+        const resp = await axios.get(url, { responseType: 'arraybuffer' });
+        result.originalImage = Buffer.from(resp.data);
+      } else if (key) {
         const imageLocation = { Bucket: bucket, Key: key };
         const originalImage = await this.s3Client.getObject(imageLocation).promise();
         const imageBuffer = Buffer.from(originalImage.Body as Uint8Array);
@@ -133,9 +137,6 @@ export class ImageRequest {
 
         result.cacheControl = originalImage.CacheControl ?? 'max-age=31536000,public';
         result.originalImage = imageBuffer;
-      } else {
-        const resp = await axios.get(url, { responseType: 'arraybuffer' });
-        result.originalImage = Buffer.from(resp.data);
       }
       return result;
     } catch (error) {
@@ -268,7 +269,7 @@ export class ImageRequest {
   public parseRequestType(event: ImageHandlerEvent): RequestTypes {
     const { path } = event;
     const matchDefault = /^(\/?)([0-9a-zA-Z+/]{4})*(([0-9a-zA-Z+/]{2}==)|([0-9a-zA-Z+/]{3}=))?$/;
-    const matchThumbor = /^(\/?)((fit-in)?|(filters:.+\(.?\))?|(unsafe)?)(((.(?!(\.[^.\\/]+$)))*$)|.*(\.jpg$|.\.png$|\.webp$|\.tiff$|\.jpeg$|\.svg$))/i;
+    const matchThumbor = /^(\/?)((fit-in)?|(filters:.+\(.?\))?|(unsafe)?)(((.(?!(\.[^.\\/]+$)))*$)|.*(\.jpg$|.\.png$|\.webp$|\.tiff$|\.jpeg$|\.svg$|\.gif$))/i;
     const { REWRITE_MATCH_PATTERN, REWRITE_SUBSTITUTION } = process.env;
     const definedEnvironmentVariables = REWRITE_MATCH_PATTERN !== '' && REWRITE_SUBSTITUTION !== '' && REWRITE_MATCH_PATTERN !== undefined && REWRITE_SUBSTITUTION !== undefined;
 
@@ -317,21 +318,34 @@ export class ImageRequest {
   /**
    * Return the sharp options
    * @param event Lambda request body.
+   * @param requestType Image handler request type.
    * @returns The sharp options
    */
-  public parseOptions(event: ImageHandlerEvent): Options {
-    const decoded = this.decodeRequest(event);
-    return decoded.options;
+  public parseOptions(event: ImageHandlerEvent, requestType: RequestTypes): Options {
+    if (requestType === RequestTypes.DEFAULT) {
+      const decoded = this.decodeRequest(event);
+      return decoded.options;
+    }
   }
 
   /**
    * Return the http url
    * @param event Lambda request body.
+   * @param requestType Image handler request type.
    * @returns The url
    */
-  public parseImageUrl(event: ImageHandlerEvent): string {
-    const decoded = this.decodeRequest(event);
-    return decoded.url;
+  public parseImageUrl(event: ImageHandlerEvent, requestType: RequestTypes): string {
+    if (requestType === RequestTypes.DEFAULT) {
+      const decoded = this.decodeRequest(event);
+      return decoded.url;
+    } else if (requestType === RequestTypes.THUMBOR) {
+      const { path } = event;
+      console.log({path})
+      const url = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
+      if (url.startsWith('https://') || url.startsWith('http://')) {
+        return url;
+      }
+    }
   }
 
   /**
