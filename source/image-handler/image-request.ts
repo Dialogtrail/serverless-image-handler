@@ -39,7 +39,6 @@ export class ImageRequest {
       imageRequestInfo.url = this.parseImageUrl(event, imageRequestInfo.requestType);
       imageRequestInfo.edits = this.parseImageEdits(event, imageRequestInfo.requestType);
       imageRequestInfo.options = this.parseOptions(event, imageRequestInfo.requestType);
-      console.log(JSON.stringify(imageRequestInfo));
 
       const originalImage = await this.getOriginalImage(imageRequestInfo.bucket, imageRequestInfo.key, imageRequestInfo.url);
       imageRequestInfo = { ...imageRequestInfo, ...originalImage };
@@ -325,6 +324,14 @@ export class ImageRequest {
     if (requestType === RequestTypes.DEFAULT) {
       const decoded = this.decodeRequest(event);
       return decoded.options;
+    } else if (requestType === RequestTypes.THUMBOR) {
+      // Currently, we only extract the `animated` flag
+      const animatedMatchResult = event.path.match(/animated\((true|false)\)/);
+
+      if (animatedMatchResult) {
+        const animated = animatedMatchResult[1] === 'true';
+        return { animated };
+      }
     }
   }
 
@@ -340,7 +347,6 @@ export class ImageRequest {
       return decoded.url;
     } else if (requestType === RequestTypes.THUMBOR) {
       const { path } = event;
-      console.log({path})
       const url = decodeURIComponent(path.slice(path.lastIndexOf('/') + 1));
       if (url.startsWith('https://') || url.startsWith('http://')) {
         return url;
